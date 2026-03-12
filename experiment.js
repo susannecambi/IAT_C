@@ -2,6 +2,10 @@ const PCLOUD_USER = "Susanne.Cambi@unil.ch";
 const PCLOUD_PASS = "gajfo1-bazvas-Tycbuk";
 const PCLOUD_FOLDER_ID = 22842773391;
 let pcloudUploadStarted = false;
+const urlParams = new URLSearchParams(window.location.search);
+let participantCode = (urlParams.get("participant_code") || "").trim();
+const taskOrder = (urlParams.get("order") || "").trim() || "NA";
+const returnUrl = (urlParams.get("return_url") || "").trim();
 
 function uploadCsvToPcloud() {
   if (pcloudUploadStarted) {
@@ -191,7 +195,11 @@ timeline.unshift(preload);
 
 let V = Math.floor(Math.random() * 16) + 1;
 console.log("Version:", V);
-jsPsych.data.addProperties({ version_v: V });
+jsPsych.data.addProperties({
+  version_v: V,
+  participant_code: participantCode,
+  task_order: taskOrder,
+});
 
 const conditions = {
   1: {
@@ -611,8 +619,6 @@ let CompteurBloc1 = 0,
 let CurrentImage = "";
 
 // Participant dialog at the beginning (participant code).
-let participantCode = "";
-
 var participant_dialog = {
   type: jsPsychSurveyText,
   questions: [
@@ -626,11 +632,17 @@ var participant_dialog = {
   button_label: "Continuer",
   on_finish: function (data) {
     participantCode = data.response.participant_code.trim();
-    jsPsych.data.addProperties({ participant_code: participantCode });
+    jsPsych.data.addProperties({
+      participant_code: participantCode,
+      task_order: taskOrder,
+      version_v: V,
+    });
   },
 };
 
-timeline.push(participant_dialog);
+if (!participantCode) {
+  timeline.push(participant_dialog);
+}
 
 /* show start image */
 var showImage = {
@@ -749,6 +761,23 @@ var end_image = {
   choices: "ALL_KEYS",
 };
 
+var return_to_qualtrics = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus:
+    '<div style="max-width:800px;margin:0 auto;color:#fff;text-align:center;line-height:1.6;">' +
+    "<h2>Tache terminee</h2>" +
+    "<p>Retournez maintenant au questionnaire pour terminer l'etude.</p>" +
+    '<p><a href="' +
+    returnUrl +
+    '" style="color:#8ec5ff;font-size:20px;">Retourner au questionnaire</a></p>' +
+    "<p>Si le lien ne fonctionne pas, copiez cette adresse :</p>" +
+    '<p style="word-break:break-all;">' +
+    returnUrl +
+    "</p>" +
+    "</div>",
+  choices: "ALL_KEYS",
+};
+
 timeline.push(bloc1_loop);
 timeline.push(inst_bloc2);
 timeline.push(bloc2_loop);
@@ -763,6 +792,9 @@ timeline.push(bloc5_training_loop);
 timeline.push(break_bloc5);
 timeline.push(bloc5_main_loop);
 timeline.push(end_image);
+if (returnUrl) {
+  timeline.push(return_to_qualtrics);
+}
 
 /* start the experiment */
 jsPsych.run(timeline);
