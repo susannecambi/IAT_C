@@ -20,8 +20,37 @@ function uploadCsvToPcloud() {
     .filterCustom(function (trial) {
       return typeof trial.block === "number";
     });
-  const csv =
-    taskData.count() > 0 ? taskData.csv() : jsPsych.data.get().csv();
+  const rowsForCsv =
+    taskData.count() > 0 ? taskData.values() : jsPsych.data.get().values();
+
+  let csv = "";
+  if (rowsForCsv.length > 0) {
+    const allKeys = Object.keys(rowsForCsv[0]);
+    const remainingKeys = allKeys.filter(function (k) {
+      return k !== "version_v";
+    });
+    const headers = ["version_v"].concat(remainingKeys);
+    const esc = function (value) {
+      if (value === null || value === undefined) return "";
+      const s = String(value);
+      if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    };
+
+    const lines = [headers.map(esc).join(",")];
+    rowsForCsv.forEach(function (row) {
+      const ordered = [V].concat(
+        remainingKeys.map(function (key) {
+          return row[key];
+        })
+      );
+      lines.push(ordered.map(esc).join(","));
+    });
+    csv = lines.join("\n");
+  } else {
+    csv = "version_v\n" + String(V);
+  }
+
   const filename = "IATC_" + safeCode + "_" + submittedAtSafe + ".csv";
 
   fetch(
@@ -162,6 +191,7 @@ timeline.unshift(preload);
 
 let V = Math.floor(Math.random() * 16) + 1;
 console.log("Version:", V);
+jsPsych.data.addProperties({ version_v: V });
 
 const conditions = {
   1: {
