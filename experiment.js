@@ -1,104 +1,106 @@
 const PCLOUD_USER = "Susanne.Cambi@unil.ch";
 const PCLOUD_PASS = "gajfo1-bazvas-Tycbuk";
 const PCLOUD_FOLDER_ID = 22842773391;
-let pcloudUploadStarted = false;
+let pcloudUploadPromise = null;
 const urlParams = new URLSearchParams(window.location.search);
 let participantCode = (urlParams.get("participant_code") || "").trim();
 const taskOrder = (urlParams.get("order") || "").trim() || "NA";
 const returnUrl = (urlParams.get("return_url") || "").trim();
 
 function uploadCsvToPcloud() {
-  if (pcloudUploadStarted) {
-    return;
+  if (pcloudUploadPromise) {
+    return pcloudUploadPromise;
   }
-  pcloudUploadStarted = true;
+  pcloudUploadPromise = Promise.resolve().then(function () {
+    const submittedAtIso = new Date().toISOString();
+    const submittedAtSafe = submittedAtIso.replace(/[:.]/g, "-");
+    const safeCode = participantCode
+      ? participantCode.replace(/[^a-zA-Z0-9_-]/g, "")
+      : "no_code";
 
-  const submittedAtIso = new Date().toISOString();
-  const submittedAtSafe = submittedAtIso.replace(/[:.]/g, "-");
-  const safeCode = participantCode
-    ? participantCode.replace(/[^a-zA-Z0-9_-]/g, "")
-    : "no_code";
+    const taskData = jsPsych.data
+      .get()
+      .filterCustom(function (trial) {
+        return typeof trial.block === "number";
+      });
+    const rowsForCsv =
+      taskData.count() > 0 ? taskData.values() : jsPsych.data.get().values();
 
-  const taskData = jsPsych.data
-    .get()
-    .filterCustom(function (trial) {
-      return typeof trial.block === "number";
-    });
-  const rowsForCsv =
-    taskData.count() > 0 ? taskData.values() : jsPsych.data.get().values();
+    let csv = "";
+    if (rowsForCsv.length > 0) {
+      const allKeys = Object.keys(rowsForCsv[0]);
+      const remainingKeys = allKeys.filter(function (k) {
+        return k !== "version_v";
+      });
+      const headers = ["version_v"].concat(remainingKeys);
+      const esc = function (value) {
+        if (value === null || value === undefined) return "";
+        const s = String(value);
+        if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+        return s;
+      };
 
-  let csv = "";
-  if (rowsForCsv.length > 0) {
-    const allKeys = Object.keys(rowsForCsv[0]);
-    const remainingKeys = allKeys.filter(function (k) {
-      return k !== "version_v";
-    });
-    const headers = ["version_v"].concat(remainingKeys);
-    const esc = function (value) {
-      if (value === null || value === undefined) return "";
-      const s = String(value);
-      if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
-      return s;
-    };
+      const lines = [headers.map(esc).join(",")];
+      rowsForCsv.forEach(function (row) {
+        const ordered = [V].concat(
+          remainingKeys.map(function (key) {
+            return row[key];
+          })
+        );
+        lines.push(ordered.map(esc).join(","));
+      });
+      csv = lines.join("\n");
+    } else {
+      csv = "version_v\n" + String(V);
+    }
 
-    const lines = [headers.map(esc).join(",")];
-    rowsForCsv.forEach(function (row) {
-      const ordered = [V].concat(
-        remainingKeys.map(function (key) {
-          return row[key];
-        })
-      );
-      lines.push(ordered.map(esc).join(","));
-    });
-    csv = lines.join("\n");
-  } else {
-    csv = "version_v\n" + String(V);
-  }
+    const filename = "IATC_" + safeCode + "_" + submittedAtSafe + ".csv";
 
-  const filename = "IATC_" + safeCode + "_" + submittedAtSafe + ".csv";
+    return fetch(
+      "https://eapi.pcloud.com/userinfo?getauth=1&logout=1" +
+        "&username=" +
+        encodeURIComponent(PCLOUD_USER) +
+        "&password=" +
+        encodeURIComponent(PCLOUD_PASS)
+    )
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (d) {
+        var token = d.auth;
+        if (!token) {
+          console.error("pCloud login failed:", d);
+          return Promise.reject("login failed");
+        }
 
-  fetch(
-    "https://eapi.pcloud.com/userinfo?getauth=1&logout=1" +
-      "&username=" +
-      encodeURIComponent(PCLOUD_USER) +
-      "&password=" +
-      encodeURIComponent(PCLOUD_PASS)
-  )
-    .then(function (r) {
-      return r.json();
-    })
-    .then(function (d) {
-      var token = d.auth;
-      if (!token) {
-        console.error("pCloud login failed:", d);
-        return Promise.reject("login failed");
-      }
+        var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        var fd = new FormData();
+        fd.append("file", blob, filename);
 
-      var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-      var fd = new FormData();
-      fd.append("file", blob, filename);
+        return fetch(
+          "https://eapi.pcloud.com/uploadfile?auth=" +
+            token +
+            "&folderid=" +
+            PCLOUD_FOLDER_ID,
+          { method: "POST", body: fd }
+        );
+      })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (d) {
+        if (d.result === 0) {
+          console.log("pCloud upload succeeded:", filename);
+        } else {
+          console.error("pCloud upload failed:", d);
+        }
+      })
+      .catch(function (e) {
+        console.error("pCloud network/upload error:", e);
+      });
+  });
 
-      return fetch(
-        "https://eapi.pcloud.com/uploadfile?auth=" +
-          token +
-          "&folderid=" +
-          PCLOUD_FOLDER_ID,
-        { method: "POST", body: fd }
-      );
-    })
-    .then(function (r) {
-      return r.json();
-    })
-    .then(function (d) {
-      if (d.result === 0) {
-        console.log("pCloud upload succeeded:", filename);
-      } else {
-        console.error("pCloud upload failed:", d);
-      }
-    })
-    .catch(function (e) {
-      console.error("pCloud network/upload error:", e);
-    });
+  return pcloudUploadPromise;
 }
 
 /* initialize jsPsych */
@@ -106,7 +108,11 @@ var jsPsych = initJsPsych({
   on_finish: function () {
     // Keep a console view for quick debugging/filtering.
     console.log("All data:", jsPsych.data.get().values());
-    uploadCsvToPcloud();
+    uploadCsvToPcloud().finally(function () {
+      if (returnUrl) {
+        window.location.href = returnUrl;
+      }
+    });
   },
 });
 
@@ -761,23 +767,6 @@ var end_image = {
   choices: "ALL_KEYS",
 };
 
-var return_to_qualtrics = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus:
-    '<div style="max-width:800px;margin:0 auto;color:#fff;text-align:center;line-height:1.6;">' +
-    "<h2>Tache terminee</h2>" +
-    "<p>Retournez maintenant au questionnaire pour terminer l'etude.</p>" +
-    '<p><a href="' +
-    returnUrl +
-    '" style="color:#8ec5ff;font-size:20px;">Retourner au questionnaire</a></p>' +
-    "<p>Si le lien ne fonctionne pas, copiez cette adresse :</p>" +
-    '<p style="word-break:break-all;">' +
-    returnUrl +
-    "</p>" +
-    "</div>",
-  choices: "ALL_KEYS",
-};
-
 timeline.push(bloc1_loop);
 timeline.push(inst_bloc2);
 timeline.push(bloc2_loop);
@@ -792,9 +781,6 @@ timeline.push(bloc5_training_loop);
 timeline.push(break_bloc5);
 timeline.push(bloc5_main_loop);
 timeline.push(end_image);
-if (returnUrl) {
-  timeline.push(return_to_qualtrics);
-}
 
 /* start the experiment */
 jsPsych.run(timeline);
