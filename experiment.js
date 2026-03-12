@@ -7,6 +7,39 @@ var jsPsych = initJsPsych({
   },
 });
 
+// Keep all image stimuli inside the viewport on any screen size.
+const responsiveImageStyle = document.createElement("style");
+responsiveImageStyle.textContent = `
+  html, body {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .jspsych-display-element,
+  .jspsych-content-wrapper,
+  .jspsych-content {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    margin: 0;
+    padding: 0;
+  }
+
+  #jspsych-image-keyboard-response-stimulus,
+  .jspsych-image-keyboard-response-stimulus {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    object-fit: contain;
+  }
+`;
+document.head.appendChild(responsiveImageStyle);
+
 /* create timeline */
 var timeline = [];
 
@@ -483,6 +516,7 @@ var beginning_bloc = {
 timeline.push(beginning_bloc);
 
 let currentIndex = 0;
+let bloc1AttemptOnImage = 1;
 
 const bloc1_trial = {
   type: jsPsychImageKeyboardResponse,
@@ -493,16 +527,19 @@ const bloc1_trial = {
   data: () => ({
     block: 1,
     image_index: currentIndex,
+    attempt_on_image: bloc1AttemptOnImage,
     image_name: bloc1listefinaleimage[currentIndex], // store image filename
     correct_key: bloc1listefinaletouche[currentIndex],
   }),
 
   on_finish: function (data) {
-    // reaction time (ms)
-    data.rt_ms = data.rt;
+    // reaction time (seconds)
+    data.rt_s = data.rt / 1000;
 
     // check correctness
     data.correct = data.response === bloc1listefinaletouche[currentIndex];
+    data.incorrect_rt_s = data.correct ? null : data.rt_s;
+    data.correct_rt_s = data.correct ? data.rt_s : null;
   },
 };
 
@@ -514,6 +551,7 @@ const bloc1_loop = {
 
     if (last.correct) {
       currentIndex++;
+      bloc1AttemptOnImage = 1;
 
       if (currentIndex >= bloc1listefinaleimage.length) {
         return false; // end block
@@ -523,6 +561,7 @@ const bloc1_loop = {
     }
 
     console.log("Wrong key, try again!");
+    bloc1AttemptOnImage++;
     return true; // repeat same image
   },
 };
