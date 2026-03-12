@@ -620,6 +620,12 @@ var break_bloc5 = {
   choices: "ALL_KEYS",
 };
 
+var end_image = {
+  type: jsPsychImageKeyboardResponse,
+  stimulus: "img/end.jpg",
+  choices: "ALL_KEYS",
+};
+
 timeline.push(bloc1_loop);
 timeline.push(inst_bloc2);
 timeline.push(bloc2_loop);
@@ -633,6 +639,7 @@ timeline.push(inst_bloc5);
 timeline.push(bloc5_training_loop);
 timeline.push(break_bloc5);
 timeline.push(bloc5_main_loop);
+timeline.push(end_image);
 
 /* start the experiment */
 jsPsych.run(timeline);
