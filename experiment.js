@@ -1,5 +1,11 @@
 /* initialize jsPsych */
-var jsPsych = initJsPsych();
+var jsPsych = initJsPsych({
+  on_finish: function () {
+
+    // Keep a console view for quick debugging/filtering.
+    console.log("All data:", jsPsych.data.get().values());
+  },
+});
 
 /* create timeline */
 var timeline = [];
@@ -485,6 +491,7 @@ const bloc1_trial = {
   trial_duration: null,
 
   data: () => ({
+    block: 1,
     image_index: currentIndex,
     image_name: bloc1listefinaleimage[currentIndex], // store image filename
     correct_key: bloc1listefinaletouche[currentIndex],

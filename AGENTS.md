@@ -1,0 +1,1 @@
+this project is a Implicit Association Task pschology experiment. Participants are shown words and need to categorise them as fast as possible. there are 5 blocks. The logic does not change much from block to block.
