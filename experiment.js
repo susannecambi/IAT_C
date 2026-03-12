@@ -488,6 +488,20 @@ let createFinalList = (base_images, base_keys, shuffle_arrays) => {
     listshuffle5troisiemepassage,
   ]));
 
+// Split blocks 3 and 5 into training then main phase.
+const bloc3TrainingLength = bloc3list_image.length;
+const bloc5TrainingLength = bloc5list_image.length;
+
+const bloc3trainingImages = bloc3listefinaleimage.slice(0, bloc3TrainingLength);
+const bloc3trainingKeys = bloc3listefinaletouche.slice(0, bloc3TrainingLength);
+const bloc3mainImages = bloc3listefinaleimage.slice(bloc3TrainingLength);
+const bloc3mainKeys = bloc3listefinaletouche.slice(bloc3TrainingLength);
+
+const bloc5trainingImages = bloc5listefinaleimage.slice(0, bloc5TrainingLength);
+const bloc5trainingKeys = bloc5listefinaletouche.slice(0, bloc5TrainingLength);
+const bloc5mainImages = bloc5listefinaleimage.slice(bloc5TrainingLength);
+const bloc5mainKeys = bloc5listefinaletouche.slice(bloc5TrainingLength);
+
 // --- Counters and current image placeholder ---
 let CompteurBloc1 = 0,
   CompteurBloc2 = 0,
@@ -515,58 +529,110 @@ var beginning_bloc = {
 };
 timeline.push(beginning_bloc);
 
-let currentIndex = 0;
-let bloc1AttemptOnImage = 1;
+function buildBlockLoop(blockNumber, blockImages, blockKeys) {
+  let currentIndex = 0;
+  let attemptOnImage = 1;
 
-const bloc1_trial = {
-  type: jsPsychImageKeyboardResponse,
-  stimulus: () => bloc1listefinaleimage[currentIndex],
-  choices: ["a", "l"],
-  trial_duration: null,
+  const blockTrial = {
+    type: jsPsychImageKeyboardResponse,
+    stimulus: () => blockImages[currentIndex],
+    choices: ["a", "l"],
+    trial_duration: null,
+    data: () => ({
+      block: blockNumber,
+      image_index: currentIndex,
+      attempt_on_image: attemptOnImage,
+      image_name: blockImages[currentIndex],
+      correct_key: blockKeys[currentIndex],
+    }),
+    on_finish: function (data) {
+      data.rt_s = data.rt / 1000;
+      data.correct = data.response === blockKeys[currentIndex];
+      data.incorrect_rt_s = data.correct ? null : data.rt_s;
+      data.correct_rt_s = data.correct ? data.rt_s : null;
+    },
+  };
 
-  data: () => ({
-    block: 1,
-    image_index: currentIndex,
-    attempt_on_image: bloc1AttemptOnImage,
-    image_name: bloc1listefinaleimage[currentIndex], // store image filename
-    correct_key: bloc1listefinaletouche[currentIndex],
-  }),
+  return {
+    timeline: [blockTrial],
+    loop_function: function (data) {
+      const last = data.values()[0];
 
-  on_finish: function (data) {
-    // reaction time (seconds)
-    data.rt_s = data.rt / 1000;
+      if (last.correct) {
+        currentIndex++;
+        attemptOnImage = 1;
 
-    // check correctness
-    data.correct = data.response === bloc1listefinaletouche[currentIndex];
-    data.incorrect_rt_s = data.correct ? null : data.rt_s;
-    data.correct_rt_s = data.correct ? data.rt_s : null;
-  },
-};
+        if (currentIndex >= blockImages.length) {
+          return false;
+        }
 
-const bloc1_loop = {
-  timeline: [bloc1_trial],
-
-  loop_function: function (data) {
-    const last = data.values()[0];
-
-    if (last.correct) {
-      currentIndex++;
-      bloc1AttemptOnImage = 1;
-
-      if (currentIndex >= bloc1listefinaleimage.length) {
-        return false; // end block
+        return true;
       }
 
-      return true; // next image
-    }
+      console.log("Wrong key, try again!");
+      attemptOnImage++;
+      return true;
+    },
+  };
+}
 
-    console.log("Wrong key, try again!");
-    bloc1AttemptOnImage++;
-    return true; // repeat same image
-  },
+const bloc1_loop = buildBlockLoop(1, bloc1listefinaleimage, bloc1listefinaletouche);
+const bloc2_loop = buildBlockLoop(2, bloc2listefinaleimage, bloc2listefinaletouche);
+const bloc3_training_loop = buildBlockLoop(3, bloc3trainingImages, bloc3trainingKeys);
+const bloc3_main_loop = buildBlockLoop(3, bloc3mainImages, bloc3mainKeys);
+const bloc4_loop = buildBlockLoop(4, bloc4listefinaleimage, bloc4listefinaletouche);
+const bloc5_training_loop = buildBlockLoop(5, bloc5trainingImages, bloc5trainingKeys);
+const bloc5_main_loop = buildBlockLoop(5, bloc5mainImages, bloc5mainKeys);
+
+var inst_bloc2 = {
+  type: jsPsychImageKeyboardResponse,
+  stimulus: InstBloc2,
+  choices: "ALL_KEYS",
+};
+
+var inst_bloc3 = {
+  type: jsPsychImageKeyboardResponse,
+  stimulus: InstBloc3,
+  choices: "ALL_KEYS",
+};
+
+var break_bloc3 = {
+  type: jsPsychImageKeyboardResponse,
+  stimulus: Break3,
+  choices: "ALL_KEYS",
+};
+
+var inst_bloc4 = {
+  type: jsPsychImageKeyboardResponse,
+  stimulus: InstBloc4,
+  choices: "ALL_KEYS",
+};
+
+var inst_bloc5 = {
+  type: jsPsychImageKeyboardResponse,
+  stimulus: InstBloc5,
+  choices: "ALL_KEYS",
+};
+
+var break_bloc5 = {
+  type: jsPsychImageKeyboardResponse,
+  stimulus: Break5,
+  choices: "ALL_KEYS",
 };
 
 timeline.push(bloc1_loop);
+timeline.push(inst_bloc2);
+timeline.push(bloc2_loop);
+timeline.push(inst_bloc3);
+timeline.push(bloc3_training_loop);
+timeline.push(break_bloc3);
+timeline.push(bloc3_main_loop);
+timeline.push(inst_bloc4);
+timeline.push(bloc4_loop);
+timeline.push(inst_bloc5);
+timeline.push(bloc5_training_loop);
+timeline.push(break_bloc5);
+timeline.push(bloc5_main_loop);
 
 /* start the experiment */
 jsPsych.run(timeline);
