@@ -510,9 +510,29 @@ let CompteurBloc1 = 0,
   CompteurBloc5 = 0;
 let CurrentImage = "";
 
-/* here i will need to show the experiment dialog (to put participant code)
+// Participant dialog at the beginning (participant code).
+let participantCode = "";
 
-  /* show start image */
+var participant_dialog = {
+  type: jsPsychSurveyText,
+  questions: [
+    {
+      prompt: "Code participant:",
+      name: "participant_code",
+      required: true,
+      columns: 20,
+    },
+  ],
+  button_label: "Continuer",
+  on_finish: function (data) {
+    participantCode = data.response.participant_code.trim();
+    jsPsych.data.addProperties({ participant_code: participantCode });
+  },
+};
+
+timeline.push(participant_dialog);
+
+/* show start image */
 var showImage = {
   type: jsPsychImageKeyboardResponse,
   stimulus: "img/start.jpg",
