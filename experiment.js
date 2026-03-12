@@ -1,9 +1,79 @@
+const PCLOUD_USER = "Susanne.Cambi@unil.ch";
+const PCLOUD_PASS = "gajfo1-bazvas-Tycbuk";
+const PCLOUD_FOLDER_ID = 22842773391;
+let pcloudUploadStarted = false;
+
+function uploadCsvToPcloud() {
+  if (pcloudUploadStarted) {
+    return;
+  }
+  pcloudUploadStarted = true;
+
+  const submittedAtIso = new Date().toISOString();
+  const submittedAtSafe = submittedAtIso.replace(/[:.]/g, "-");
+  const safeCode = participantCode
+    ? participantCode.replace(/[^a-zA-Z0-9_-]/g, "")
+    : "no_code";
+
+  const taskData = jsPsych.data
+    .get()
+    .filterCustom(function (trial) {
+      return typeof trial.block === "number";
+    });
+  const csv =
+    taskData.count() > 0 ? taskData.csv() : jsPsych.data.get().csv();
+  const filename = "IATC_" + safeCode + "_" + submittedAtSafe + ".csv";
+
+  fetch(
+    "https://eapi.pcloud.com/userinfo?getauth=1&logout=1" +
+      "&username=" +
+      encodeURIComponent(PCLOUD_USER) +
+      "&password=" +
+      encodeURIComponent(PCLOUD_PASS)
+  )
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (d) {
+      var token = d.auth;
+      if (!token) {
+        console.error("pCloud login failed:", d);
+        return Promise.reject("login failed");
+      }
+
+      var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      var fd = new FormData();
+      fd.append("file", blob, filename);
+
+      return fetch(
+        "https://eapi.pcloud.com/uploadfile?auth=" +
+          token +
+          "&folderid=" +
+          PCLOUD_FOLDER_ID,
+        { method: "POST", body: fd }
+      );
+    })
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (d) {
+      if (d.result === 0) {
+        console.log("pCloud upload succeeded:", filename);
+      } else {
+        console.error("pCloud upload failed:", d);
+      }
+    })
+    .catch(function (e) {
+      console.error("pCloud network/upload error:", e);
+    });
+}
+
 /* initialize jsPsych */
 var jsPsych = initJsPsych({
   on_finish: function () {
-
     // Keep a console view for quick debugging/filtering.
     console.log("All data:", jsPsych.data.get().values());
+    uploadCsvToPcloud();
   },
 });
 
@@ -603,6 +673,9 @@ const bloc3_main_loop = buildBlockLoop(3, bloc3mainImages, bloc3mainKeys);
 const bloc4_loop = buildBlockLoop(4, bloc4listefinaleimage, bloc4listefinaletouche);
 const bloc5_training_loop = buildBlockLoop(5, bloc5trainingImages, bloc5trainingKeys);
 const bloc5_main_loop = buildBlockLoop(5, bloc5mainImages, bloc5mainKeys);
+bloc5_main_loop.on_timeline_finish = function () {
+  uploadCsvToPcloud();
+};
 
 var inst_bloc2 = {
   type: jsPsychImageKeyboardResponse,
