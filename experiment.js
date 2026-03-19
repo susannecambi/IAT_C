@@ -38,8 +38,8 @@ function uploadCsvToPcloud() {
           shownWord: (row.image_name || "").replace(/^img\//, ""),
           toucheBonneReponse: row.correct_key || "",
           reponse: "",
-          rtFirstPress: row.rt,
-          rtFinal: row.rt,
+          rtFirstPress: row.rt_first_press_ms ?? row.rt,
+          rtFinal: row.rt_final_ms ?? row.rt,
           participant: participantCode || "",
           taskOrder: taskOrder,
           trialIndexInBlock: (row.image_index || 0) + 1,
@@ -48,14 +48,14 @@ function uploadCsvToPcloud() {
       }
 
       const trial = groupedTrials.get(key);
-      if (row.attempt_on_image === 1) {
-        trial.rtFirstPress = row.rt;
+      if (typeof row.rt_first_press_ms === "number") {
+        trial.rtFirstPress = row.rt_first_press_ms;
       }
-      if (!row.correct) {
+      if (typeof row.rt_final_ms === "number") {
+        trial.rtFinal = row.rt_final_ms;
+      }
+      if (row.had_incorrect === true) {
         trial.reponse = "Faute";
-      }
-      if (row.correct) {
-        trial.rtFinal = row.rt;
       }
     });
 
@@ -732,48 +732,91 @@ timeline.push(beginning_bloc);
 
 function buildBlockLoop(blockNumber, blockImages, blockKeys, blockSegment) {
   let currentIndex = 0;
-  let attemptOnImage = 1;
+  let keyboardListener = null;
+  let firstPressRt = null;
+  let firstPressKey = null;
+  let hadIncorrect = false;
+  let trialImageIndex = 0;
+  let trialCorrectKey = "";
 
   const blockTrial = {
-    type: jsPsychImageKeyboardResponse,
-    stimulus: () => blockImages[currentIndex],
-    choices: ["a", "l"],
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: () =>
+      '<img src="' +
+      blockImages[currentIndex] +
+      '" style="width:100vw;height:100vh;max-width:100vw;max-height:100vh;object-fit:contain;" />',
+    choices: "NO_KEYS",
     trial_duration: null,
-    data: () => ({
-      block: blockNumber,
-      block_segment: blockSegment,
-      image_index: currentIndex,
-      attempt_on_image: attemptOnImage,
-      image_name: blockImages[currentIndex],
-      correct_key: blockKeys[currentIndex],
-    }),
-    on_finish: function (data) {
-      data.rt_s = data.rt / 1000;
-      data.correct = data.response === blockKeys[currentIndex];
-      data.incorrect_rt_s = data.correct ? null : data.rt_s;
-      data.correct_rt_s = data.correct ? data.rt_s : null;
+    on_start: function () {
+      firstPressRt = null;
+      firstPressKey = null;
+      hadIncorrect = false;
+      trialImageIndex = currentIndex;
+      trialCorrectKey = blockKeys[currentIndex];
+    },
+    on_load: function () {
+      keyboardListener = jsPsych.pluginAPI.getKeyboardResponse({
+        valid_responses: ["a", "l"],
+        persist: true,
+        allow_held_key: false,
+        callback_function: function (info) {
+          const pressedKey = String(info.key).toLowerCase();
+
+          if (firstPressRt === null) {
+            firstPressRt = info.rt;
+            firstPressKey = pressedKey;
+          }
+
+          const isCorrect = jsPsych.pluginAPI.compareKeys(pressedKey, trialCorrectKey);
+          if (!isCorrect) {
+            hadIncorrect = true;
+            return;
+          }
+
+          if (keyboardListener !== null) {
+            jsPsych.pluginAPI.cancelKeyboardResponse(keyboardListener);
+            keyboardListener = null;
+          }
+
+          const finalRt = info.rt;
+          const firstRt = firstPressRt === null ? finalRt : firstPressRt;
+
+          jsPsych.finishTrial({
+            block: blockNumber,
+            block_segment: blockSegment,
+            image_index: trialImageIndex,
+            attempt_on_image: 1,
+            image_name: blockImages[trialImageIndex],
+            correct_key: trialCorrectKey,
+            response: pressedKey,
+            first_response: firstPressKey || pressedKey,
+            rt: finalRt,
+            rt_s: finalRt / 1000,
+            rt_first_press_ms: firstRt,
+            rt_first_press_s: firstRt / 1000,
+            rt_final_ms: finalRt,
+            rt_final_s: finalRt / 1000,
+            had_incorrect: hadIncorrect,
+            correct: true,
+            incorrect_rt_s: hadIncorrect ? firstRt / 1000 : null,
+            correct_rt_s: finalRt / 1000,
+          });
+        },
+      });
+    },
+    on_finish: function () {
+      if (keyboardListener !== null) {
+        jsPsych.pluginAPI.cancelKeyboardResponse(keyboardListener);
+        keyboardListener = null;
+      }
     },
   };
 
   return {
     timeline: [blockTrial],
-    loop_function: function (data) {
-      const last = data.values()[0];
-
-      if (last.correct) {
-        currentIndex++;
-        attemptOnImage = 1;
-
-        if (currentIndex >= blockImages.length) {
-          return false;
-        }
-
-        return true;
-      }
-
-      console.log("Wrong key, try again!");
-      attemptOnImage++;
-      return true;
+    loop_function: function () {
+      currentIndex++;
+      return currentIndex < blockImages.length;
     },
   };
 }
