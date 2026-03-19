@@ -34,7 +34,7 @@ function uploadCsvToPcloud() {
         groupedTrials.set(key, {
           version: V,
           block: row.block,
-          trialType: "test",
+          trialType: blockSegment === "training" ? "training" : "test",
           shownWord: (row.image_name || "").replace(/^img\//, ""),
           toucheBonneReponse: row.correct_key || "",
           reponse: "",
@@ -60,10 +60,15 @@ function uploadCsvToPcloud() {
     });
 
     const segmentOrder = { training: 0, full: 1, main: 2 };
+    const getSegmentRank = function (segment) {
+      return Object.prototype.hasOwnProperty.call(segmentOrder, segment)
+        ? segmentOrder[segment]
+        : 99;
+    };
     const rowsForCsv = Array.from(groupedTrials.values()).sort(function (a, b) {
       if (a.block !== b.block) return a.block - b.block;
-      if ((segmentOrder[a.blockSegment] || 99) !== (segmentOrder[b.blockSegment] || 99)) {
-        return (segmentOrder[a.blockSegment] || 99) - (segmentOrder[b.blockSegment] || 99);
+      if (getSegmentRank(a.blockSegment) !== getSegmentRank(b.blockSegment)) {
+        return getSegmentRank(a.blockSegment) - getSegmentRank(b.blockSegment);
       }
       return a.trialIndexInBlock - b.trialIndexInBlock;
     });
