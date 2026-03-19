@@ -425,6 +425,7 @@ let InstBloc4 = "img/" + condition.b4;
 let InstBloc5 = "img/" + condition.b5;
 let Break5 = "img/" + condition.br5;
 let Block5Condition = condition.b5.includes("bloc5a") ? "A" : "B";
+console.log("Block5 condition:", Block5Condition, "(" + condition.b5 + ")");
 
 // from: PrepaExpeVersion code:
 
@@ -711,26 +712,6 @@ var participant_dialog = {
 if (!participantCode) {
   timeline.push(participant_dialog);
 }
-
-var debug_start_info = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus:
-    '<div style="max-width:700px;margin:0 auto;color:#fff;text-align:center;line-height:1.8;">' +
-    "<h2>Debug pilot</h2>" +
-    "<p>Version = " +
-    V +
-    "</p>" +
-    "<p>Block5 = " +
-    Block5Condition +
-    " (" +
-    condition.b5 +
-    ")" +
-    "</p>" +
-    "<p>Appuyez sur une touche pour commencer.</p>" +
-    "</div>",
-  choices: "ALL_KEYS",
-};
-timeline.push(debug_start_info);
 
 /* show start image */
 var showImage = {
