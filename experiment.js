@@ -1,5 +1,5 @@
 const PCLOUD_USER = "Susanne.Cambi@unil.ch";
-const PCLOUD_PASS = "gajfo1-bazvas-Tycbuk";
+const PCLOUD_PASS = "qojtir-wantoG-2vabny";
 const PCLOUD_FOLDER_ID = 22842773391;
 let pcloudUploadPromise = null;
 const urlParams = new URLSearchParams(window.location.search);
