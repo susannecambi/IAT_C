@@ -18,41 +18,99 @@ function uploadCsvToPcloud() {
       ? participantCode.replace(/[^a-zA-Z0-9_-]/g, "")
       : "no_code";
 
-    const taskData = jsPsych.data
+    const attemptRows = jsPsych.data
       .get()
       .filterCustom(function (trial) {
         return typeof trial.block === "number";
-      });
-    const rowsForCsv =
-      taskData.count() > 0 ? taskData.values() : jsPsych.data.get().values();
+      })
+      .values();
 
-    let csv = "";
-    if (rowsForCsv.length > 0) {
-      const allKeys = Object.keys(rowsForCsv[0]);
-      const remainingKeys = allKeys.filter(function (k) {
-        return k !== "version_v";
-      });
-      const headers = ["version_v"].concat(remainingKeys);
-      const esc = function (value) {
-        if (value === null || value === undefined) return "";
-        const s = String(value);
-        if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
-        return s;
-      };
+    const groupedTrials = new Map();
+    attemptRows.forEach(function (row) {
+      const blockSegment = row.block_segment || "full";
+      const key = [row.block, blockSegment, row.image_index].join("|");
 
-      const lines = [headers.map(esc).join(",")];
-      rowsForCsv.forEach(function (row) {
-        const ordered = [V].concat(
-          remainingKeys.map(function (key) {
-            return row[key];
-          })
-        );
-        lines.push(ordered.map(esc).join(","));
-      });
-      csv = lines.join("\n");
-    } else {
-      csv = "version_v\n" + String(V);
-    }
+      if (!groupedTrials.has(key)) {
+        groupedTrials.set(key, {
+          version: V,
+          block: row.block,
+          trialType: "test",
+          shownWord: (row.image_name || "").replace(/^img\//, ""),
+          toucheBonneReponse: row.correct_key || "",
+          reponse: "",
+          rtFirstPress: row.rt,
+          rtFinal: row.rt,
+          participant: participantCode || "",
+          taskOrder: taskOrder,
+          trialIndexInBlock: (row.image_index || 0) + 1,
+          blockSegment: blockSegment,
+        });
+      }
+
+      const trial = groupedTrials.get(key);
+      if (row.attempt_on_image === 1) {
+        trial.rtFirstPress = row.rt;
+      }
+      if (!row.correct) {
+        trial.reponse = "Faute";
+      }
+      if (row.correct) {
+        trial.rtFinal = row.rt;
+      }
+    });
+
+    const segmentOrder = { training: 0, full: 1, main: 2 };
+    const rowsForCsv = Array.from(groupedTrials.values()).sort(function (a, b) {
+      if (a.block !== b.block) return a.block - b.block;
+      if ((segmentOrder[a.blockSegment] || 99) !== (segmentOrder[b.blockSegment] || 99)) {
+        return (segmentOrder[a.blockSegment] || 99) - (segmentOrder[b.blockSegment] || 99);
+      }
+      return a.trialIndexInBlock - b.trialIndexInBlock;
+    });
+
+    const headers = [
+      "Version",
+      "Block",
+      "TrialType",
+      "ShownWord",
+      "ToucheBonneReponse",
+      "Reponse",
+      "RT_FirstPress",
+      "RT_Final",
+      "Participant",
+      "TaskOrder",
+      "TrialIndex",
+      "BlockSegment",
+    ];
+
+    const esc = function (value) {
+      if (value === null || value === undefined) return "";
+      const s = String(value);
+      if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    };
+
+    let globalTrialIndex = 1;
+    const lines = [headers.map(esc).join(",")];
+    rowsForCsv.forEach(function (row) {
+      const ordered = [
+        row.version,
+        row.block,
+        row.trialType,
+        row.shownWord,
+        row.toucheBonneReponse,
+        row.reponse,
+        row.rtFirstPress,
+        row.rtFinal,
+        row.participant,
+        row.taskOrder,
+        globalTrialIndex,
+        row.blockSegment,
+      ];
+      lines.push(ordered.map(esc).join(","));
+      globalTrialIndex++;
+    });
+    const csv = lines.join("\n");
 
     const filename = "IATC_" + safeCode + "_" + submittedAtSafe + ".csv";
 
@@ -667,7 +725,7 @@ var beginning_bloc = {
 };
 timeline.push(beginning_bloc);
 
-function buildBlockLoop(blockNumber, blockImages, blockKeys) {
+function buildBlockLoop(blockNumber, blockImages, blockKeys, blockSegment) {
   let currentIndex = 0;
   let attemptOnImage = 1;
 
@@ -678,6 +736,7 @@ function buildBlockLoop(blockNumber, blockImages, blockKeys) {
     trial_duration: null,
     data: () => ({
       block: blockNumber,
+      block_segment: blockSegment,
       image_index: currentIndex,
       attempt_on_image: attemptOnImage,
       image_name: blockImages[currentIndex],
@@ -714,13 +773,13 @@ function buildBlockLoop(blockNumber, blockImages, blockKeys) {
   };
 }
 
-const bloc1_loop = buildBlockLoop(1, bloc1listefinaleimage, bloc1listefinaletouche);
-const bloc2_loop = buildBlockLoop(2, bloc2listefinaleimage, bloc2listefinaletouche);
-const bloc3_training_loop = buildBlockLoop(3, bloc3trainingImages, bloc3trainingKeys);
-const bloc3_main_loop = buildBlockLoop(3, bloc3mainImages, bloc3mainKeys);
-const bloc4_loop = buildBlockLoop(4, bloc4listefinaleimage, bloc4listefinaletouche);
-const bloc5_training_loop = buildBlockLoop(5, bloc5trainingImages, bloc5trainingKeys);
-const bloc5_main_loop = buildBlockLoop(5, bloc5mainImages, bloc5mainKeys);
+const bloc1_loop = buildBlockLoop(1, bloc1listefinaleimage, bloc1listefinaletouche, "full");
+const bloc2_loop = buildBlockLoop(2, bloc2listefinaleimage, bloc2listefinaletouche, "full");
+const bloc3_training_loop = buildBlockLoop(3, bloc3trainingImages, bloc3trainingKeys, "training");
+const bloc3_main_loop = buildBlockLoop(3, bloc3mainImages, bloc3mainKeys, "main");
+const bloc4_loop = buildBlockLoop(4, bloc4listefinaleimage, bloc4listefinaletouche, "full");
+const bloc5_training_loop = buildBlockLoop(5, bloc5trainingImages, bloc5trainingKeys, "training");
+const bloc5_main_loop = buildBlockLoop(5, bloc5mainImages, bloc5mainKeys, "main");
 bloc5_main_loop.on_timeline_finish = function () {
   uploadCsvToPcloud();
 };
