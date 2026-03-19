@@ -85,7 +85,6 @@ function uploadCsvToPcloud() {
       "Participant",
       "TaskOrder",
       "TrialIndex",
-      "BlockSegment",
     ];
 
     const esc = function (value) {
@@ -110,7 +109,6 @@ function uploadCsvToPcloud() {
         row.participant,
         row.taskOrder,
         globalTrialIndex,
-        row.blockSegment,
       ];
       lines.push(ordered.map(esc).join(","));
       globalTrialIndex++;
