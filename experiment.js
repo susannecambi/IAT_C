@@ -74,17 +74,17 @@ function uploadCsvToPcloud() {
     });
 
     const headers = [
+      "Participant",
       "Version",
       "Block",
+      "TrialIndex",
       "TrialType",
       "ShownWord",
       "ToucheBonneReponse",
       "Reponse",
       "RT_FirstPress",
       "RT_Final",
-      "Participant",
       "TaskOrder",
-      "TrialIndex",
     ];
 
     const esc = function (value) {
@@ -98,17 +98,17 @@ function uploadCsvToPcloud() {
     const lines = [headers.map(esc).join(",")];
     rowsForCsv.forEach(function (row) {
       const ordered = [
+        row.participant,
         row.version,
         row.block,
+        globalTrialIndex,
         row.trialType,
         row.shownWord,
         row.toucheBonneReponse,
         row.reponse,
         row.rtFirstPress,
         row.rtFinal,
-        row.participant,
         row.taskOrder,
-        globalTrialIndex,
       ];
       lines.push(ordered.map(esc).join(","));
       globalTrialIndex++;
