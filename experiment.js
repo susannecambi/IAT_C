@@ -1,5 +1,4 @@
-const PCLOUD_USER = "Susanne.Cambi@unil.ch";
-const PCLOUD_PASS = "97531!onceuponatime";
+const PCLOUD_TOKEN = "R506OZLC62ZLbDkagQfdifepDb5mQAfAyLkCtgV";
 const PCLOUD_FOLDER_ID = 22842773391;
 let pcloudUploadPromise = null;
 const urlParams = new URLSearchParams(window.location.search);
@@ -117,35 +116,17 @@ function uploadCsvToPcloud() {
 
     const filename = "IATC_" + safeCode + "_" + submittedAtSafe + ".csv";
 
+    var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    var fd = new FormData();
+    fd.append("file", blob, filename);
+
     return fetch(
-      "https://eapi.pcloud.com/userinfo?getauth=1&logout=1" +
-        "&username=" +
-        encodeURIComponent(PCLOUD_USER) +
-        "&password=" +
-        encodeURIComponent(PCLOUD_PASS)
+      "https://eapi.pcloud.com/uploadfile?auth=" +
+        encodeURIComponent(PCLOUD_TOKEN) +
+        "&folderid=" +
+        PCLOUD_FOLDER_ID,
+      { method: "POST", body: fd }
     )
-      .then(function (r) {
-        return r.json();
-      })
-      .then(function (d) {
-        var token = d.auth;
-        if (!token) {
-          console.error("pCloud login failed:", d);
-          return Promise.reject("login failed");
-        }
-
-        var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-        var fd = new FormData();
-        fd.append("file", blob, filename);
-
-        return fetch(
-          "https://eapi.pcloud.com/uploadfile?auth=" +
-            token +
-            "&folderid=" +
-            PCLOUD_FOLDER_ID,
-          { method: "POST", body: fd }
-        );
-      })
       .then(function (r) {
         return r.json();
       })
